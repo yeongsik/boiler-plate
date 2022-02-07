@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const config = require('./config/key');
 const {User} = require("./models/User");
+const {auth} = require('./middleware/auth');
 // 클라이언트에서 오는 정보를 서버에서 분석해서 가져올 수 있게해주는 module : bodyParser
 
 //application/x-www-form-urlencoded
@@ -20,7 +21,7 @@ mongoose.connect(config.mongoURI).then(() => console.log('MongoDB Connected...')
 
 app.get('/', (req, res) => res.send('하하호호.'));
 
-app.post('/register',(req,res) =>{
+app.post('api/users/register',(req,res) =>{
 
     //회원 가입 할 때 필요한 정보들을 client에서 가져오면
     //그것들을 데이터베이스에 넣어준다.
@@ -34,7 +35,7 @@ app.post('/register',(req,res) =>{
     }); // save() -> mongoDB 메서드 저장
 });
 
-app.post('/login', (req,res) =>{
+app.post('api/users/login', (req,res) =>{
 
     //요청된 이메일을 데이터베이스에서 있는지 찾는다.
     User.findOne({email:req.body.email},(err,user) => {
@@ -62,7 +63,36 @@ app.post('/login', (req,res) =>{
             });
         });
     });
+});
+// 미들웨어 auth 추가
+// 미들웨어란? 경로를 받고 callback를 가기 전에 중간에서 진행되는 것
+app.get('/api/users/auth',auth ,(req,res) =>{
+    // 여기까지 왔으면 미들웨어가 통과되었다는 말
+    res.status(200).json({
+        _id: req.user._id,
+        isAdmin : req.user.role === 0 ? false : true,
+        isAuth : true,
+        email : req.user.email,
+        name : req.user.name,
+        lastname : req.user.lastname,
+        role : req.user.role,
+        image : req.user.image,
+    })
+});
 
+// 로그아웃 라우트 만들기
+
+app.get('/api/users/logout' , auth , (req,res) => {
+    // 로그아웃 할 때 DB 에서 해당 유저의 토큰을 지워준다.
+
+    User.findOneAndUpdate({ _id : req.user._id },
+        { token : ""}
+    , (err, user) => {
+        if(err) return  res.json({succes: false , err});
+        return res.status(200).send({
+            success: true,
+        });
+    });
 });
 
 app.listen(port, () => console.log(`Example app listening on port ${port}!`));
